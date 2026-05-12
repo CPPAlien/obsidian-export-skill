@@ -53,30 +53,48 @@ obsidian-export [OPTIONS] <VAULT> <DESTINATION>
 | `--no-git` | 禁用 Git 忽略规则 |
 | `--no-recursive-embeds` | 递归嵌入时改为插入链接而非报错 |
 
-## 导出场景
+## Excalidraw 预处理脚本
 
-### 单篇文章
+Obsidian 中的 `![[name.excalidraw]]` 引用在导出时无法被 obsidian-export 解析（它找不到没有扩展名的文件）。使用 `scripts/prepare-export.py` 预处理后再导出。
+
+脚本逻辑：
+1. 扫描文档中所有 `![[*.excalidraw]]` 引用
+2. 在原文件所在目录查找同名的 `.excalidraw.png` 或 `.excalidraw.svg`
+3. 将引用替换为带扩展名版本（如 `![[阶段.excalidraw.png]]`）
+4. 将修改后的内容写入临时目录（**原文件不变**）
+5. 把找到的图片资产也复制到临时目录
+6. 对临时文件运行 obsidian-export
+7. 将产物（markdown + 图片）写入目标目录，清理临时目录
+
+### 单篇文章（含 excalidraw）
 
 ```bash
-obsidian-export \
-  "/Users/chris/Documents/Obsidian Vault" \
-  --start-at "/Users/chris/Documents/Obsidian Vault/Vibe Design/M3-M4-M5 架构演变.md" \
-  /tmp/obsidian-out/
+python3 ~/.claude/skills/obsidian-export/scripts/prepare-export.py \
+  "<source.md>" \
+  "<destination.md>"
+```
+
+### 单篇文章（无 excalidraw）
+
+```bash
+source $HOME/.cargo/env && obsidian-export \
+  "<source.md>" \
+  "<destination.md>"
 ```
 
 ### 某个子目录
 
 ```bash
-obsidian-export \
+source $HOME/.cargo/env && obsidian-export \
   "/Users/chris/Documents/Obsidian Vault" \
-  --start-at "/Users/chris/Documents/Obsidian Vault/Vibe Design" \
+  --start-at "<subdir-path>" \
   /tmp/obsidian-out/
 ```
 
 ### 整个 Vault
 
 ```bash
-obsidian-export \
+source $HOME/.cargo/env && obsidian-export \
   "/Users/chris/Documents/Obsidian Vault" \
   /tmp/obsidian-out/
 ```
@@ -86,9 +104,10 @@ obsidian-export \
 1. **解析意图** — 根据用户描述的文档名、目录名或关键词，在 Vault 中定位目标文件/目录（用 `find` 搜索）
 2. **确认目标** — 把找到的路径告诉用户并确认（如果唯一则直接确认）
 3. **检查工具** — 确认 obsidian-export 已安装
-4. **确定输出目录** — 默认 `/tmp/obsidian-out/<slug>`，如用户指定则优先使用
-5. **运行导出** — 执行命令，捕获输出，报告成功/失败
-6. **后续操作** — 导出后询问用户是否需要推送到某个目标（如 CF Pages、服务器等）
+4. **确定输出目录** — 默认 `/tmp/obsidian-out/`，如用户指定则优先使用
+5. **检测 excalidraw** — 如果文档含 `*.excalidraw` 引用，用 `prepare-export.py` 预处理；否则直接用 obsidian-export
+6. **运行导出** — 执行命令，捕获输出，报告成功/失败及产物列表
+7. **后续操作** — 导出后询问用户是否需要推送到某个目标（如 CF Pages、服务器等）
 
 ## 错误处理
 
