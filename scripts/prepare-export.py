@@ -75,10 +75,13 @@ def main():
         if not obsidian_export.exists():
             obsidian_export = Path("obsidian-export")
 
-        destination.parent.mkdir(parents=True, exist_ok=True)
+        dest_dir = destination.parent
+        dest_dir.mkdir(parents=True, exist_ok=True)
 
+        # Use tmpdir as vault + --start-at so obsidian-export can resolve
+        # assets (PNG/SVG) that sit next to the patched markdown file.
         result = subprocess.run(
-            [str(obsidian_export), str(tmp_md), str(destination)],
+            [str(obsidian_export), str(tmpdir), "--start-at", str(tmp_md), str(dest_dir)],
             capture_output=True,
             text=True,
         )
@@ -88,8 +91,11 @@ def main():
             print(result.stderr, file=sys.stderr)
 
         if result.returncode == 0:
-            # Copy assets to destination directory as well
-            dest_dir = destination.parent
+            # obsidian-export writes <dest_dir>/<source.name>; rename if destination differs
+            produced = dest_dir / source.name
+            if produced != destination and produced.exists():
+                produced.rename(destination)
+            # Copy assets to destination directory
             for asset in assets:
                 shutil.copy2(asset, dest_dir / asset.name)
             print(f"Exported: {destination}")
